@@ -1,0 +1,291 @@
+<head>
+  <meta charset="UTF-8">
+  <title>Order Slip Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- ✅ Mobile scaling -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f4f4f9;
+    padding: 20px;
+  }
+  h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+  }
+  .form-container, .slip-container {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  label {
+    display: block;
+    margin-top: 10px;
+    font-weight: bold;
+  }
+  input, textarea {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 1rem;
+  }
+  button {
+    margin-top: 15px;
+    padding: 12px 15px;
+    border: none;
+    border-radius: 8px;
+    background: #007bff;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    width: 100%; /* ✅ Full width on mobile */
+  }
+  button:hover {
+    background: #0056b3;
+  }
+  .product-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .product-row input {
+    flex: 1;
+  }
+  .slip {
+    border: 1px dashed #333;
+    padding: 15px;
+    border-radius: 8px;
+    background: #fafafa;
+    overflow-x: auto; /* ✅ Table scroll on small screens */
+  }
+  .slip table {
+    width: 100%;
+    margin-top: 10px;
+    border-collapse: collapse;
+  }
+  .slip th, .slip td {
+    text-align: left;
+    padding: 6px;
+    border-bottom: 1px solid #ddd;
+    font-size: 0.9rem;
+  }
+  .slip th {
+    font-weight: bold;
+    background: none;
+  }
+
+  /* ✅ Mobile responsiveness */
+  @media (max-width: 600px) {
+    h1 {
+      font-size: 1.2rem;
+    }
+    .product-row {
+      flex-direction: column; /* stack inputs */
+    }
+    .product-row input {
+      width: 100%;
+    }
+    button {
+      font-size: 14px;
+    }
+    .slip th, .slip td {
+      font-size: 0.8rem;
+    }
+  }
+</style>
+
+<body>
+
+  <h1>Order Slip Generator</h1>
+
+  <div class="form-container">
+    <label >Order No</label>
+    <input type="text" id="order">
+    <label>Customer Name</label>
+    <input type="text" id="customerName">
+    <label>Phone Number</label>
+    <input type="text" id="phone">
+    <label>WhatsApp Number</label>
+    <input type="text" id="whats">
+    <label>Address</label>
+    <textarea id="address"></textarea>
+
+    <h3>Products</h3>
+    <div id="productsContainer">
+      <div class="product-row">
+        <input type="text" placeholder="Product Name" class="product">
+        <input type="number" placeholder="Quantity" class="quantity" value="1">
+        <input type="number" placeholder="Price per Item" class="price" value="0">
+      </div>
+    </div>
+    <button type="button" onclick="addProductRow()">+ Add Another Product</button>
+
+    <br><br>
+    <button onclick="generateSlip()">Generate Slip</button>
+  </div>
+
+  <div class="slip-container" id="slipContainer" style="display:none;">
+    <div class="slip" id="slipContent"></div>
+    <button onclick="downloadPDF()">Download PDF</button>
+  </div>
+
+<script>
+  let orderData = {};
+
+function addProductRow() {
+  const container = document.getElementById("productsContainer");
+  const row = document.createElement("div");
+  row.classList.add("product-row");
+  row.innerHTML = `
+    <input type="text" placeholder="Product Name" class="product">
+    <input type="number" placeholder="Quantity" class="quantity" value="1">
+    <input type="number" placeholder="Price per Item" class="price" value="0">
+  `;
+  container.appendChild(row);
+}
+
+function generateSlip() {
+  const products = document.querySelectorAll(".product-row");
+  let items = [];
+  let grandTotal = 0;
+
+  products.forEach(row => {
+    const product = row.querySelector(".product").value;
+    const qty = parseInt(row.querySelector(".quantity").value) || 0;
+    const price = parseFloat(row.querySelector(".price").value) || 0;
+    const total = qty * price;
+
+    if (product.trim() !== "" && qty > 0) {
+      items.push({ product, qty, price, total });
+      grandTotal += total;
+    }
+  });
+
+  orderData = {
+    name: document.getElementById("customerName").value,
+    phone: document.getElementById("phone").value,
+    whats: document.getElementById("whats").value,
+    address: document.getElementById("address").value,
+    items,
+    grandTotal,
+    order: document.getElementById("order").value
+  };
+
+  let slipHTML = `
+    <div style="text-align:center; margin-bottom:10px;">
+      <h2 style="margin:0;">Ryan’s Mart Cell Store</h2>
+    </div>
+    <hr>
+    <table>
+      <tr>
+        <td><b>Order No:</b> ${orderData.order}</td>
+        <td><b>Customer:</b> ${orderData.name}</td>
+      </tr>
+      <tr>
+        <td><b>Phone:</b> ${orderData.phone}</td>
+        <td><b>WhatsApp No:</b> ${orderData.whats}</td>
+      </tr>
+      <tr>
+        <td colspan="2"><b>Address:</b> ${orderData.address}</td>
+      </tr>
+    </table>
+    <table>
+      <tr><th>Product</th><th>Quantity</th><th>Price/Item</th><th>Total</th></tr>
+      ${orderData.items.map(item =>
+        `<tr>
+          <td>${item.product}</td>
+          <td>${item.qty}</td>
+          <td>${item.price} PKR</td>
+          <td>${item.total} PKR</td>
+        </tr>`
+      ).join("")}
+    </table>
+    <p style="text-align:right; margin-top:10px;"><b>Total Amount: ${orderData.grandTotal} PKR</b></p>
+    <hr>
+    <div style="text-align:center; margin-top:15px;">
+      <h3 style="margin:0;">RETURN ADDRESS</h3>
+      <p style="margin:2px 0;"><b>Ryan’s Mart Cell Store</b></p>
+      <p style="margin:2px 0;">Phone: 051-2285609 | WhatsApp: 03320000305</p>
+      <p style="margin:2px 0;">SHOP NO 15 LOWER GROUND MALL 9 NEAR BANK AL HABIB,<br>G-9 MARKAZ ISLAMABAD</p>
+    </div>
+    <p style="text-align:center; margin-top:10px;">Thank you for shopping!</p>
+  `;
+
+  document.getElementById("slipContent").innerHTML = slipHTML;
+  document.getElementById("slipContainer").style.display = "block";
+}
+
+
+function downloadPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  // Title on top
+  doc.setFontSize(16);
+  doc.text("Ryan’s Mart Cell Store", 105, 15, { align: "center" });
+
+  // Directly add content (no logo)
+  addPDFContent(doc);
+
+  // Save the file
+  doc.save("order-invoice.pdf");
+}
+
+
+function addPDFContent(doc) {
+  // Customer info
+  doc.setFontSize(11);
+  doc.text(`Order No: ${orderData.order}`, 14, 55);
+  doc.text(`Customer: ${orderData.name}`, 110, 55);
+  doc.text(`Phone: ${orderData.phone}`, 14, 62);
+  doc.text(`WhatsApp No: ${orderData.whats}`, 110, 62);
+  doc.text(`Address: ${orderData.address}`, 14, 69);
+
+  // Product table
+  const tableData = orderData.items.map(item => [
+    item.product, item.qty, item.price + " PKR", item.total + " PKR"
+  ]);
+
+  doc.autoTable({
+    startY: 80,
+    head: [["Product", "Quantity", "Price/Item", "Total"]],
+    body: tableData,
+    theme: "plain",
+    styles: { lineWidth: 0, textColor: [0, 0, 0] },
+    headStyles: { fillColor: false, textColor: [0, 0, 0], fontStyle: "bold" }
+  });
+
+  // Grand total
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text(`Total Amount: ${orderData.grandTotal} PKR`, 150, doc.lastAutoTable.finalY + 10);
+  doc.setFont("helvetica", "normal");
+
+  // Return Address
+  let y = doc.lastAutoTable.finalY + 25;
+  doc.setFontSize(13);
+  doc.text("RETURN ADDRESS", 105, y, { align: "center" });
+  doc.setFontSize(11);
+  doc.text("Ryan’s Mart Cell Store", 105, y + 7, { align: "center" });
+  doc.text("Phone: 051-2285609 | WhatsApp: 03320000305", 105, y + 14, { align: "center" });
+  doc.text("SHOP NO 15 LOWER GROUND MALL 9 NEAR BANK AL HABIB,", 105, y + 21, { align: "center" });
+  doc.text("G-9 MARKAZ ISLAMABAD", 105, y + 28, { align: "center" });
+
+  // Footer
+  doc.setFontSize(12);
+  doc.text("Thank you for shopping!", 105, y + 45, { align: "center" });
+}
+</script>
+</body>
+</html>
